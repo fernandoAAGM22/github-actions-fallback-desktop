@@ -11,9 +11,7 @@ function safeConfig() {
       manualTokenConfigured: false,
       stateFile: 'unavailable',
       preloadAvailable: false,
-      repoSlug: 'fernandoAAGM22/mun-sung-core',
-      repoUrl: 'https://github.com/fernandoAAGM22/mun-sung-core',
-      githubActionsUrl: 'https://github.com/fernandoAAGM22/mun-sung-core/actions'
+      repoSlug: 'fernandoAAGM22/mun-sung-core'
     };
   }
 
@@ -29,9 +27,7 @@ function safeConfig() {
       stateFile: 'unavailable',
       preloadAvailable: false,
       preloadError: error instanceof Error ? error.message : String(error),
-      repoSlug: 'fernandoAAGM22/mun-sung-core',
-      repoUrl: 'https://github.com/fernandoAAGM22/mun-sung-core',
-      githubActionsUrl: 'https://github.com/fernandoAAGM22/mun-sung-core/actions'
+      repoSlug: 'fernandoAAGM22/mun-sung-core'
     };
   }
 }
@@ -502,12 +498,12 @@ function App() {
         <div className="topbar">
           <div className="brand">
             <div className="brand-title">Actions Control Surface</div>
-            <div className="brand-subtitle">Desktop view for GitHub Actions and the WSL fallback runner on {config.repoSlug}.</div>
+            <div className="brand-subtitle">Desktop view for the fallback runner and its local workflow history on {config.repoSlug}.</div>
           </div>
           <div className="topbar-controls">
             <input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter workflow runs" />
             <button className="btn" onClick={() => { refreshRunner(); refreshWorkflows(); refreshRuns(); if (selectedRunId) refreshDetail(selectedRunId); }}>Refresh</button>
-            <button className="btn primary" onClick={() => openExternal(config.githubActionsUrl)}>Open GitHub</button>
+            <button className="btn primary" onClick={() => openExternal(`${config.apiBaseUrl}/actions/workflows`)}>Open runner API</button>
           </div>
         </div>
         <div className="layout">
@@ -515,7 +511,7 @@ function App() {
             <div className="section">
               <div className="inlineRow" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
                 <div className="section-title" style={{ marginBottom: 0 }}>Actions</div>
-                <button className="btn primary" onClick={() => openExternal(config.githubActionsUrl)}>New workflow</button>
+                <button className="btn primary" onClick={triggerDeploy}>Run deploy</button>
               </div>
               <div className="workflowList">
                 {workflowsPayload.workflows.map((workflow) => (
@@ -531,11 +527,11 @@ function App() {
               </div>
               <div className="sidebarFooter">
                 <div className="section-title" style={{ marginBottom: 0 }}>Management</div>
-                <button className="linkButton" onClick={() => openExternal(managementLinks.caches)}><span>Caches</span><span className="muted">↗</span></button>
-                <button className="linkButton" onClick={() => openExternal(managementLinks.attestations)}><span>Attestations</span><span className="muted">↗</span></button>
-                <button className="linkButton" onClick={() => openExternal(managementLinks.runners)}><span>Runners</span><span className="muted">↗</span></button>
-                <button className="linkButton" onClick={() => openExternal(managementLinks.usage)}><span>Usage metrics</span><span className="muted">↗</span></button>
-                <button className="linkButton" onClick={() => openExternal(managementLinks.performance)}><span>Performance metrics</span><span className="muted">↗</span></button>
+                <button className="linkButton" onClick={() => openExternal(managementLinks.caches)}><span>Caches</span><span className="muted">{managementLinks.caches ? '↗' : 'local'}</span></button>
+                <button className="linkButton" onClick={() => openExternal(managementLinks.attestations)}><span>Attestations</span><span className="muted">{managementLinks.attestations ? '↗' : 'local'}</span></button>
+                <button className="linkButton" onClick={() => openExternal(managementLinks.runners)}><span>Runners</span><span className="muted">{managementLinks.runners ? '↗' : 'local'}</span></button>
+                <button className="linkButton" onClick={() => openExternal(managementLinks.usage)}><span>Usage metrics</span><span className="muted">{managementLinks.usage ? '↗' : 'local'}</span></button>
+                <button className="linkButton" onClick={() => openExternal(managementLinks.performance)}><span>Performance metrics</span><span className="muted">{managementLinks.performance ? '↗' : 'local'}</span></button>
               </div>
               <RunnerStatusCard status={status} logs={logs} />
             </div>
@@ -596,8 +592,7 @@ function App() {
               <div className="inlineRow" style={{ marginBottom: 12 }}>
                 <input className="smallInput" value={deployRef} onChange={(event) => setDeployRef(event.target.value)} placeholder="main or svc/erp-fe/main" />
                 <button className="btn primary" onClick={triggerDeploy}>Trigger fallback deploy</button>
-                {summaryRun ? <button className="btn" onClick={() => openExternal(summaryRun.htmlUrl)}>Open selected run</button> : null}
-                {selectedWorkflow?.url ? <button className="btn" onClick={() => openExternal(selectedWorkflow.url)}>Open workflow file</button> : null}
+                {selectedRunId ? <button className="btn" onClick={() => refreshDetail(selectedRunId)}>Refresh run detail</button> : null}
               </div>
               {manualMessage ? <div className="muted">{manualMessage}</div> : null}
             </div>
