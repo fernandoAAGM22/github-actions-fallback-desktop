@@ -2,8 +2,35 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { useEffect, useMemo, useState } from 'react';
 
-const shell = window.fallbackDesktop;
-const config = shell.config();
+const shell = window.fallbackDesktop ?? null;
+
+function safeConfig() {
+  if (!shell || typeof shell.config !== 'function') {
+    return {
+      apiBaseUrl: 'unavailable',
+      manualTokenConfigured: false,
+      stateFile: 'unavailable',
+      preloadAvailable: false
+    };
+  }
+
+  try {
+    return {
+      ...shell.config(),
+      preloadAvailable: true
+    };
+  } catch (error) {
+    return {
+      apiBaseUrl: 'unavailable',
+      manualTokenConfigured: false,
+      stateFile: 'unavailable',
+      preloadAvailable: false,
+      preloadError: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+const config = safeConfig();
 
 const css = `
 :root {
@@ -78,11 +105,22 @@ function App() {
   const [logs, setLogs] = useState({ runner: '', reverse: '', state: '' });
   const [deployRef, setDeployRef] = useState('main');
   const [manualMessage, setManualMessage] = useState('');
+  const [uiError, setUiError] = useState(config.preloadError || '');
 
   async function refresh() {
-    const statusRes = await shell.fetchStatus();
-    setStatus(statusRes);
-    setLogs(shell.logs());
+    if (!shell) {
+      setUiError('Electron preload bridge is not available. The desktop app cannot reach the fallback runner.');
+      return;
+    }
+
+    try {
+      const statusRes = await shell.fetchStatus();
+      setStatus(statusRes);
+      setLogs(shell.logs());
+      setUiError('');
+    } catch (error) {
+      setUiError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   useEffect(() => {
@@ -99,10 +137,18 @@ function App() {
   }), [status]);
 
   async function triggerDeploy() {
+    if (!shell) {
+      setManualMessage('Manual deploy is unavailable because the preload bridge is missing.');
+      return;
+    }
     setManualMessage('Triggering deploy...');
-    const result = await shell.triggerDeploy(deployRef);
-    setManualMessage(result.ok ? `Accepted manual deploy for ${deployRef}` : `Failed with ${result.status}: ${result.body}`);
-    setTimeout(refresh, 800);
+    try {
+      const result = await shell.triggerDeploy(deployRef);
+      setManualMessage(result.ok ? `Accepted manual deploy for ${deployRef}` : `Failed with ${result.status}: ${result.body}`);
+      setTimeout(refresh, 800);
+    } catch (error) {
+      setManualMessage(`Manual deploy failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   return (
@@ -130,6 +176,8 @@ function App() {
               <StatusBadge status={status?.status} busy={status?.busy} />
               <span className={status?.lastError ? 'bad' : 'good'}>{status?.lastError ? `Last error: ${status.lastError}` : 'No active error'}</span>
             </div>
+            {!config.preloadAvailable ? <div style={{ marginBottom: 16, color: '#f26f63' }}>Preload bridge unavailable. The window is rendered in degraded mode.</div> : null}
+            {uiError ? <div style={{ marginBottom: 16, color: '#f5b14c' }}>UI error: {uiError}</div> : null}
             <div className="row" style={{ marginBottom: 16 }}>
               <input className="input" value={deployRef} onChange={(e) => setDeployRef(e.target.value)} placeholder="main or svc/erp-fe/main" />
               <button className="btn" onClick={triggerDeploy}>Trigger Deploy</button>

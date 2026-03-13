@@ -18,6 +18,12 @@ function createWindow() {
 
   const devUrl = process.env.FALLBACK_DESKTOP_URL || 'http://127.0.0.1:5179';
   const builtIndex = path.join(__dirname, '..', 'dist', 'index.html');
+  win.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
+    console.error('fallback-desktop did-fail-load', { code, description, validatedURL });
+  });
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log(`fallback-desktop console[${level}] ${sourceId}:${line} ${message}`);
+  });
   if (process.env.FALLBACK_DESKTOP_URL || !fs.existsSync(builtIndex)) {
     win.loadURL(devUrl);
   } else {
