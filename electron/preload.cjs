@@ -84,6 +84,22 @@ contextBridge.exposeInMainWorld('fallbackDesktop', {
     const env = loadConfig();
     return fetchJson(`${env.apiBaseUrl}/status`);
   },
+  async fetchSourceStatus() {
+    const env = loadConfig();
+    return fetchJson(`${env.apiBaseUrl}/source/status`);
+  },
+  async syncSourceMirror(refName) {
+    const env = loadConfig();
+    const headers = {};
+    if (env.manualToken) headers['X-Trigger-Token'] = env.manualToken;
+    const qp = refName ? `?ref=${encodeURIComponent(refName)}` : '';
+    return fetchJson(`${env.apiBaseUrl}/source/sync${qp}`, { method: 'POST', headers });
+  },
+  async fetchSourceDiff(refName) {
+    const env = loadConfig();
+    const qp = refName ? `?ref=${encodeURIComponent(refName)}` : '';
+    return fetchJson(`${env.apiBaseUrl}/source/diff${qp}`);
+  },
   async fetchActionsWorkflows() {
     const env = loadConfig();
     return fetchJson(`${env.apiBaseUrl}/actions/workflows`);

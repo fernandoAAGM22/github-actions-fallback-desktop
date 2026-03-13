@@ -383,6 +383,9 @@ function App() {
   const [search, setSearch] = useState('');
   const [deployRef, setDeployRef] = useState('main');
   const [manualMessage, setManualMessage] = useState('');
+  const [sourceMessage, setSourceMessage] = useState('');
+  const [sourceDiff, setSourceDiff] = useState(null);
+  const [loadingSource, setLoadingSource] = useState(false);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -397,6 +400,20 @@ function App() {
       setLogs(shell.logs());
     } catch (error) {
       setUiError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function refreshSourceDiff(refName = deployRef) {
+    if (!shell) return;
+    setLoadingSource(true);
+    try {
+      const payload = await shell.fetchSourceDiff(refName);
+      setSourceDiff(payload);
+      setUiError('');
+    } catch (error) {
+      setUiError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoadingSource(false);
     }
   }
 
@@ -483,13 +500,29 @@ function App() {
 
   async function triggerDeploy() {
     if (!shell) return;
-    setManualMessage(`Triggering deploy for ${deployRef}...`);
+    setManualMessage(`Triggering mirror deploy for ${deployRef}...`);
     try {
       const result = await shell.triggerDeploy(deployRef);
-      setManualMessage(result.ok ? `Accepted manual deploy for ${deployRef}` : `Failed with ${result.status}: ${result.body}`);
+      setManualMessage(result.ok ? `Accepted mirror deploy for ${deployRef}` : `Failed with ${result.status}: ${result.body}`);
       setTimeout(refreshRunner, 800);
     } catch (error) {
       setManualMessage(`Manual deploy failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function syncMirrorNow() {
+    if (!shell) return;
+    setSourceMessage(`Syncing mirror for ${deployRef}...`);
+    setLoadingSource(true);
+    try {
+      const result = await shell.syncSourceMirror(deployRef);
+      setSourceMessage(`Mirror synced to ${result.sha} (${result.updated ? 'updated' : 'already current'})`);
+      await refreshRunner();
+      await refreshSourceDiff(deployRef);
+    } catch (error) {
+      setSourceMessage(`Mirror sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingSource(false);
     }
   }
 
@@ -515,7 +548,7 @@ function App() {
             <div className="section">
               <div className="inlineRow" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
                 <div className="section-title" style={{ marginBottom: 0 }}>Actions</div>
-                <button className="btn primary" onClick={triggerDeploy}>Run deploy</button>
+                <button className="btn primary" onClick={triggerDeploy}>Deploy from mirror</button>
               </div>
               <div className="workflowList">
                 {workflowsPayload.workflows.map((workflow) => (
@@ -590,15 +623,38 @@ function App() {
             </div>
 
             <div className="contentSection">
-              <h3>Run Control</h3>
+              <h3>Mirror Control</h3>
               {!config.preloadAvailable ? <div className="empty">Preload bridge unavailable. The desktop app is in degraded mode.</div> : null}
               {uiError ? <div className="empty bad">{uiError}</div> : null}
               <div className="inlineRow" style={{ marginBottom: 12 }}>
                 <input className="smallInput" value={deployRef} onChange={(event) => setDeployRef(event.target.value)} placeholder="main or svc/erp-fe/main" />
-                <button className="btn primary" onClick={triggerDeploy}>Trigger fallback deploy</button>
+                <button className="btn" onClick={syncMirrorNow}>Sync mirror now</button>
+                <button className="btn primary" onClick={triggerDeploy}>Deploy from mirror now</button>
+                <button className="btn" onClick={() => refreshSourceDiff(deployRef)}>View mirror/source diff</button>
                 {selectedRunId ? <button className="btn" onClick={() => refreshDetail(selectedRunId)}>Refresh run detail</button> : null}
               </div>
               {manualMessage ? <div className="muted">{manualMessage}</div> : null}
+              {sourceMessage ? <div className="muted">{sourceMessage}</div> : null}
+            </div>
+
+            <div className="contentSection">
+              <h3>Mirror Diff</h3>
+              {loadingSource ? <div className="empty">Loading mirror state…</div> : null}
+              {!loadingSource && !sourceDiff ? <div className="empty">No mirror/source diff loaded yet.</div> : null}
+              {!loadingSource && sourceDiff ? (
+                <>
+                  <div className="kv" style={{ marginBottom: 14 }}>
+                    <div>Mode</div><div>{sourceDiff.sourceMode}</div>
+                    <div>Ref</div><div>{sourceDiff.ref}</div>
+                    <div>Mirror SHA</div><div>{sourceDiff.mirrorSha || 'none'}</div>
+                    <div>Source SHA</div><div>{sourceDiff.sourceSha || 'none'}</div>
+                    <div>Changed</div><div>{String(sourceDiff.changed)}</div>
+                  </div>
+                  {!sourceDiff.files?.length ? <div className="empty">No file-level drift between mirror and source.</div> : (
+                    <pre>{sourceDiff.files.map((entry) => `${entry.status} ${entry.path}`).join('\n')}</pre>
+                  )}
+                </>
+              ) : null}
             </div>
 
             <div className="contentSection">
