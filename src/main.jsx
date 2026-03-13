@@ -360,6 +360,8 @@ function RunnerStatusCard({ status, logs }) {
         <div>Busy</div><div>{String(status?.busy ?? false)}</div>
         <div>Last SHA</div><div>{status?.lastResult?.sha || 'none'}</div>
         <div>Active Job</div><div>{status?.activeJob ? JSON.stringify(status.activeJob) : 'none'}</div>
+        <div>Source Mode</div><div>{status?.sourceMode || 'unknown'}</div>
+        <div>Source Repo</div><div>{status?.localSourceRepoDir || 'n/a'}</div>
       </div>
       <pre>{logs.runner || 'No runner log yet.'}</pre>
     </div>
