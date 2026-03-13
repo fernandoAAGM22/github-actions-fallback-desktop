@@ -385,6 +385,8 @@ function App() {
   const [manualMessage, setManualMessage] = useState('');
   const [sourceMessage, setSourceMessage] = useState('');
   const [sourceDiff, setSourceDiff] = useState(null);
+  const [rollbackCandidates, setRollbackCandidates] = useState([]);
+  const [rollbackSha, setRollbackSha] = useState('');
   const [loadingSource, setLoadingSource] = useState(false);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -403,11 +405,11 @@ function App() {
     }
   }
 
-  async function refreshSourceDiff(refName = deployRef) {
+  async function refreshSourceDiff(refName = deployRef, workflowId = selectedWorkflowId) {
     if (!shell) return;
     setLoadingSource(true);
     try {
-      const payload = await shell.fetchSourceDiff(refName);
+      const payload = await shell.fetchSourceDiff(refName, workflowId);
       setSourceDiff(payload);
       setUiError('');
     } catch (error) {
@@ -462,6 +464,17 @@ function App() {
 
   useEffect(() => {
     refreshRuns(selectedWorkflowId).catch((error) => setUiError(error.message));
+    if (shell && selectedWorkflowId && selectedWorkflowId !== 'all') {
+      shell.fetchRollbackCandidates(selectedWorkflowId)
+        .then((payload) => {
+          setRollbackCandidates(payload.runs || []);
+          setRollbackSha(payload.runs?.[0]?.sha || '');
+        })
+        .catch((error) => setUiError(error.message));
+    } else {
+      setRollbackCandidates([]);
+      setRollbackSha('');
+    }
   }, [selectedWorkflowId]);
 
   useEffect(() => {
@@ -502,8 +515,8 @@ function App() {
     if (!shell) return;
     setManualMessage(`Triggering mirror deploy for ${deployRef}...`);
     try {
-      const result = await shell.triggerDeploy(deployRef);
-      setManualMessage(result.ok ? `Accepted mirror deploy for ${deployRef}` : `Failed with ${result.status}: ${result.body}`);
+      const result = await shell.triggerDeploy(deployRef, selectedWorkflowId);
+      setManualMessage(result.ok ? `Accepted mirror deploy for ${deployRef}${selectedWorkflowId !== 'all' ? ` (${selectedWorkflowId})` : ''}` : `Failed with ${result.status}: ${result.body}`);
       setTimeout(refreshRunner, 800);
     } catch (error) {
       setManualMessage(`Manual deploy failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -518,9 +531,25 @@ function App() {
       const result = await shell.syncSourceMirror(deployRef);
       setSourceMessage(`Mirror synced to ${result.sha} (${result.updated ? 'updated' : 'already current'})`);
       await refreshRunner();
-      await refreshSourceDiff(deployRef);
+      await refreshSourceDiff(deployRef, selectedWorkflowId);
     } catch (error) {
       setSourceMessage(`Mirror sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingSource(false);
+    }
+  }
+
+  async function triggerRollback() {
+    if (!shell || !rollbackSha || !selectedWorkflowId || selectedWorkflowId === 'all') return;
+    setSourceMessage(`Triggering rollback of ${selectedWorkflowId} to ${rollbackSha}...`);
+    setLoadingSource(true);
+    try {
+      await shell.triggerRollback(rollbackSha, selectedWorkflowId);
+      setSourceMessage(`Accepted rollback of ${selectedWorkflowId} to ${rollbackSha}`);
+      await refreshRunner();
+      await refreshRuns(selectedWorkflowId);
+    } catch (error) {
+      setSourceMessage(`Rollback failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoadingSource(false);
     }
@@ -630,11 +659,24 @@ function App() {
                 <input className="smallInput" value={deployRef} onChange={(event) => setDeployRef(event.target.value)} placeholder="main or svc/erp-fe/main" />
                 <button className="btn" onClick={syncMirrorNow}>Sync mirror now</button>
                 <button className="btn primary" onClick={triggerDeploy}>Deploy from mirror now</button>
-                <button className="btn" onClick={() => refreshSourceDiff(deployRef)}>View mirror/source diff</button>
+                <button className="btn" onClick={() => refreshSourceDiff(deployRef, selectedWorkflowId)}>View mirror/source diff</button>
                 {selectedRunId ? <button className="btn" onClick={() => refreshDetail(selectedRunId)}>Refresh run detail</button> : null}
               </div>
               {manualMessage ? <div className="muted">{manualMessage}</div> : null}
               {sourceMessage ? <div className="muted">{sourceMessage}</div> : null}
+              {selectedWorkflowId !== 'all' ? (
+                <div className="inlineRow">
+                  <select className="smallInput" value={rollbackSha} onChange={(event) => setRollbackSha(event.target.value)}>
+                    <option value="">Select previous successful SHA</option>
+                    {rollbackCandidates.map((run) => (
+                      <option key={`${run.id}:${run.sha}`} value={run.sha}>
+                        {shortSha(run.sha)} · #{run.runNumber} · {formatWhen(run.updatedAt)}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn" onClick={triggerRollback} disabled={!rollbackSha}>Rollback selected service</button>
+                </div>
+              ) : null}
             </div>
 
             <div className="contentSection">

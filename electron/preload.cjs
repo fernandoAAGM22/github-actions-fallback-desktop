@@ -72,10 +72,11 @@ contextBridge.exposeInMainWorld('fallbackDesktop', {
       state: fs.existsSync(stateFile) ? fs.readFileSync(stateFile, 'utf8') : ''
     };
   },
-  async triggerDeploy(refName) {
+  async triggerDeploy(refName, serviceSlug) {
     const env = loadConfig();
     const headers = { 'X-Deploy-Ref': refName || 'main' };
     if (env.manualToken) headers['X-Trigger-Token'] = env.manualToken;
+    if (serviceSlug && serviceSlug !== 'all') headers['X-Deploy-Service'] = serviceSlug;
     const response = await fetch(`${env.apiBaseUrl}/deploy`, { method: 'POST', headers });
     const text = await response.text();
     return { ok: response.ok, status: response.status, body: text };
@@ -95,10 +96,27 @@ contextBridge.exposeInMainWorld('fallbackDesktop', {
     const qp = refName ? `?ref=${encodeURIComponent(refName)}` : '';
     return fetchJson(`${env.apiBaseUrl}/source/sync${qp}`, { method: 'POST', headers });
   },
-  async fetchSourceDiff(refName) {
+  async fetchSourceDiff(refName, workflowId) {
     const env = loadConfig();
-    const qp = refName ? `?ref=${encodeURIComponent(refName)}` : '';
+    const query = new URLSearchParams();
+    if (refName) query.set('ref', refName);
+    if (workflowId) query.set('workflowId', workflowId);
+    const qp = query.toString() ? `?${query.toString()}` : '';
     return fetchJson(`${env.apiBaseUrl}/source/diff${qp}`);
+  },
+  async fetchRollbackCandidates(workflowId) {
+    const env = loadConfig();
+    const qp = workflowId ? `?workflowId=${encodeURIComponent(workflowId)}` : '';
+    return fetchJson(`${env.apiBaseUrl}/actions/rollbacks${qp}`);
+  },
+  async triggerRollback(sha, workflowId) {
+    const env = loadConfig();
+    const headers = {};
+    if (env.manualToken) headers['X-Trigger-Token'] = env.manualToken;
+    const query = new URLSearchParams();
+    query.set('sha', sha);
+    query.set('workflowId', workflowId);
+    return fetchJson(`${env.apiBaseUrl}/deploy/rollback?${query.toString()}`, { method: 'POST', headers });
   },
   async fetchActionsWorkflows() {
     const env = loadConfig();
