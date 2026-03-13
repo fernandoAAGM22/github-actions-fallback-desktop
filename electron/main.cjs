@@ -1,5 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -16,7 +17,12 @@ function createWindow() {
   });
 
   const devUrl = process.env.FALLBACK_DESKTOP_URL || 'http://127.0.0.1:5179';
-  win.loadURL(devUrl);
+  const builtIndex = path.join(__dirname, '..', 'dist', 'index.html');
+  if (process.env.FALLBACK_DESKTOP_URL || !fs.existsSync(builtIndex)) {
+    win.loadURL(devUrl);
+  } else {
+    win.loadFile(builtIndex);
+  }
 }
 
 app.whenReady().then(() => {
