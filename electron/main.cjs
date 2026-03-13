@@ -12,7 +12,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false
     }
   });
 
@@ -21,8 +22,14 @@ function createWindow() {
   win.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
     console.error('fallback-desktop did-fail-load', { code, description, validatedURL });
   });
-  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    console.log(`fallback-desktop console[${level}] ${sourceId}:${line} ${message}`);
+  win.webContents.on('console-message', (_event, details) => {
+    const {
+      level,
+      message,
+      lineNumber,
+      sourceId
+    } = details || {};
+    console.log(`fallback-desktop console[${level}] ${sourceId}:${lineNumber} ${message}`);
   });
   if (process.env.FALLBACK_DESKTOP_URL || !fs.existsSync(builtIndex)) {
     win.loadURL(devUrl);
