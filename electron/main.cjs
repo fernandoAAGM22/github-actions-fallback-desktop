@@ -22,13 +22,7 @@ function createWindow() {
   win.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
     console.error('fallback-desktop did-fail-load', { code, description, validatedURL });
   });
-  win.webContents.on('console-message', (_event, details) => {
-    const {
-      level,
-      message,
-      lineNumber,
-      sourceId
-    } = details || {};
+  win.webContents.on('console-message', (_event, level, message, lineNumber, sourceId) => {
     console.log(`fallback-desktop console[${level}] ${sourceId}:${lineNumber} ${message}`);
   });
   if (process.env.FALLBACK_DESKTOP_URL || !fs.existsSync(builtIndex)) {
