@@ -362,6 +362,8 @@ function RunnerStatusCard({ status, logs }) {
         <div>Active Job</div><div>{status?.activeJob ? JSON.stringify(status.activeJob) : 'none'}</div>
         <div>Source Mode</div><div>{status?.sourceMode || 'unknown'}</div>
         <div>Source Repo</div><div>{status?.localSourceRepoDir || 'n/a'}</div>
+        <div>Mirror Dir</div><div>{status?.mirrorDir || 'n/a'}</div>
+        <div>Mirror SHA</div><div>{status?.sourceMeta?.sha || 'n/a'}</div>
       </div>
       <pre>{logs.runner || 'No runner log yet.'}</pre>
     </div>
